@@ -1,8 +1,7 @@
 package com.example.demo.dto;
 
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public class InvoiceDTO {
@@ -12,7 +11,7 @@ public class InvoiceDTO {
     private Date date;
 	private String customer;
 	private String note;
-    private List<ItemDTO> items = new ArrayList<>();
+    private Set<ItemDTO> items;
 	public UUID getId() {
 		return id;
 	}
@@ -43,11 +42,11 @@ public class InvoiceDTO {
 	public void setNote(String note) {
 		this.note = note;
 	}
-	public List<ItemDTO> getItems() {
+	public Set<ItemDTO> getItems() {
 		return items;
 	}
-	public void setItems(List<ItemDTO> items) {
+	public void setItems(Set<ItemDTO> items) {
 		this.items = items;
 	}
-    
+	
 }

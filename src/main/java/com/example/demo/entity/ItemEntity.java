@@ -2,6 +2,7 @@ package com.example.demo.entity;
 
 import java.io.Serializable;
 
+import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
@@ -30,7 +31,7 @@ public class ItemEntity implements Serializable {
 	@Column(name = "note")
 	private String note;
 	
-	@ManyToOne
+	@ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(name="invoice_id", nullable = false)
     private InvoiceEntity invoice;
 

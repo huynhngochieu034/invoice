@@ -1,9 +1,8 @@
 package com.example.demo.entity;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import javax.persistence.CascadeType;
@@ -37,8 +36,8 @@ public class InvoiceEntity implements Serializable {
 	@Column(name = "note")
 	private String note;
 	
-	@OneToMany(mappedBy = "invoice", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
-    private List<ItemEntity> items = new ArrayList<>();
+	@OneToMany(mappedBy = "invoice", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    private Set<ItemEntity> items;
 
 	public UUID getId() {
 		return id;
@@ -80,11 +79,11 @@ public class InvoiceEntity implements Serializable {
 		this.note = note;
 	}
 
-	public List<ItemEntity> getItems() {
+	public Set<ItemEntity> getItems() {
 		return items;
 	}
 
-	public void setItems(List<ItemEntity> items) {
+	public void setItems(Set<ItemEntity> items) {
 		this.items = items;
 	}
 
