@@ -11,7 +11,6 @@ import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Expression;
 import javax.persistence.criteria.Join;
 import javax.persistence.criteria.JoinType;
-import javax.persistence.criteria.ParameterExpression;
 import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
 import javax.persistence.criteria.Subquery;
@@ -41,16 +40,10 @@ public class InvoiceCustomRepositoryImpl implements InvoiceCustomRepository {
 		CriteriaQuery<InvoiceEntity> criteriaQuery = criteriaBuilder.createQuery(InvoiceEntity.class);
 		Root<InvoiceEntity> root = criteriaQuery.from(InvoiceEntity.class);
 
-		Subquery<Long> sub = criteriaQuery.subquery(Long.class);
-		Root<ItemEntity> subRoot = sub.from(ItemEntity.class);
-		
-		sub.select(criteriaBuilder.count(subRoot.get("id")));
-		sub.where(criteriaBuilder.equal(root.get("id"), subRoot.get("invoice").get("id")));
-		
-		Predicate predicate = getPredicate(invoiceCriteria, criteriaBuilder, root, sub);
+		Predicate predicate = getPredicate(invoiceCriteria, criteriaQuery, criteriaBuilder, root);
 		criteriaQuery.where(predicate);
 		
-		setOrder(invoicePage, criteriaBuilder, criteriaQuery, root, sub);
+		setOrder(invoicePage, criteriaBuilder, criteriaQuery, root);
 		
 		TypedQuery<InvoiceEntity> query = entityManager.createQuery(criteriaQuery);
 		query.setFirstResult(invoicePage.getPageNumber() * invoicePage.getPageSize());
@@ -63,8 +56,8 @@ public class InvoiceCustomRepositoryImpl implements InvoiceCustomRepository {
 		return new PageImpl<>(query.getResultList(), pageable, count);
 	}
 
-	private Predicate getPredicate(InvoiceCriteria invoiceCriteria, CriteriaBuilder criteriaBuilder,
-			Root<InvoiceEntity> root, Subquery<Long> sub) {
+	private Predicate getPredicate(InvoiceCriteria invoiceCriteria, CriteriaQuery<InvoiceEntity> criteriaQuery, CriteriaBuilder criteriaBuilder,
+			Root<InvoiceEntity> root) {
 		List<Predicate> predicates = new ArrayList<>();
 
 		if (Objects.nonNull(invoiceCriteria.getFromDate()) && Objects.nonNull(invoiceCriteria.getToDate())) {
@@ -78,6 +71,12 @@ public class InvoiceCustomRepositoryImpl implements InvoiceCustomRepository {
 		}
 		
 		if (Objects.nonNull(invoiceCriteria.getFromAmountItem()) && Objects.nonNull(invoiceCriteria.getToAmountItem())) {
+			
+			Subquery<Long> sub = criteriaQuery.subquery(Long.class);
+			Root<ItemEntity> subRoot = sub.from(ItemEntity.class);
+			sub.select(criteriaBuilder.count(subRoot.get("id")));
+			sub.where(criteriaBuilder.equal(root.get("id"), subRoot.get("invoice").get("id")));
+			
 			predicates.add(criteriaBuilder.between(sub, invoiceCriteria.getFromAmountItem(),
 					invoiceCriteria.getToAmountItem()));
 		}
@@ -86,26 +85,16 @@ public class InvoiceCustomRepositoryImpl implements InvoiceCustomRepository {
 	}
 
 	private void setOrder(InvoicePage invoicePage, CriteriaBuilder criteriaBuilder,
-			CriteriaQuery<InvoiceEntity> criteriaQuery, Root<InvoiceEntity> root, 
-			Subquery<Long> sub) {
+			CriteriaQuery<InvoiceEntity> criteriaQuery, Root<InvoiceEntity> root) {
 		if (invoicePage.getSortBy() != null) {
 			if ("asc".equals(invoicePage.getSortDirection().toLowerCase())) {
 				if ("amountItem".equals(invoicePage.getSortBy())){
-					
-					Join<InvoiceEntity, ItemEntity> join = root.join("items", JoinType.INNER);
-					Expression<Long> countExp = criteriaBuilder.count(join.get("id"));
-					criteriaQuery.groupBy(root.get("id"));
-					
-					criteriaQuery.orderBy(criteriaBuilder.asc(countExp));
+					sortByItem(criteriaBuilder, criteriaQuery, root, String.valueOf("asc"));
 				}
 				else criteriaQuery.orderBy(criteriaBuilder.asc(root.get(invoicePage.getSortBy())));
 			} else if ("desc".equals(invoicePage.getSortDirection().toLowerCase())) {
 				if ("amountItem".equals(invoicePage.getSortBy())){
-					
-					Join<InvoiceEntity, ItemEntity> join = root.join("items", JoinType.INNER);
-					Expression<Long> countExp = criteriaBuilder.count(join.get("id"));
-					criteriaQuery.groupBy(root.get("id"));
-					criteriaQuery.orderBy(criteriaBuilder.desc(countExp));
+					sortByItem(criteriaBuilder, criteriaQuery, root, String.valueOf("desc"));
 				}
 				else criteriaQuery.orderBy(criteriaBuilder.desc(root.get(invoicePage.getSortBy())));
 			}
@@ -126,6 +115,15 @@ public class InvoiceCustomRepositoryImpl implements InvoiceCustomRepository {
 		countQuery.select(criteriaBuilder.count(countRoot)).where(predicate);
 
 		return entityManager.createQuery(countQuery).getSingleResult();
+	}
+	
+	private void sortByItem(CriteriaBuilder criteriaBuilder, CriteriaQuery<InvoiceEntity> criteriaQuery,
+			Root<InvoiceEntity> root, String direction) {
+		Join<InvoiceEntity, ItemEntity> join = root.join("items", JoinType.INNER);
+		Expression<Long> countExp = criteriaBuilder.count(join.get("id"));
+		criteriaQuery.groupBy(root.get("id"));
+		if (direction.equals("asc")) criteriaQuery.orderBy(criteriaBuilder.asc(countExp));
+		if (direction.equals("desc")) criteriaQuery.orderBy(criteriaBuilder.desc(countExp));
 	}
 
 }
