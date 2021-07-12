@@ -1,12 +1,10 @@
 package com.example.demo.dto;
 
-import org.springframework.data.domain.Sort;
-
 public class InvoicePage {
 	private int pageNumber = 0;
 	private int pageSize = 10;
-	private Sort.Direction sortDirection = Sort.Direction.ASC;
-	private String sortBy = "date";
+	private String sortDirection = "asc";
+	private String sortBy;
 	
 	public int getPageNumber() {
 		return pageNumber;
@@ -20,10 +18,10 @@ public class InvoicePage {
 	public void setPageSize(int pageSize) {
 		this.pageSize = pageSize;
 	}
-	public Sort.Direction getSortDirection() {
+	public String getSortDirection() {
 		return sortDirection;
 	}
-	public void setSortDirection(Sort.Direction sortDirection) {
+	public void setSortDirection(String sortDirection) {
 		this.sortDirection = sortDirection;
 	}
 	public String getSortBy() {

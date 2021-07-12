@@ -8,8 +8,10 @@ import javax.persistence.EntityManager;
 import javax.persistence.TypedQuery;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Expression;
 import javax.persistence.criteria.Join;
 import javax.persistence.criteria.JoinType;
+import javax.persistence.criteria.ParameterExpression;
 import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
 import javax.persistence.criteria.Subquery;
@@ -39,27 +41,17 @@ public class InvoiceCustomRepositoryImpl implements InvoiceCustomRepository {
 		CriteriaQuery<InvoiceEntity> criteriaQuery = criteriaBuilder.createQuery(InvoiceEntity.class);
 		Root<InvoiceEntity> root = criteriaQuery.from(InvoiceEntity.class);
 
-		if (Objects.nonNull(invoiceCriteria.getFromAmountItem()) && Objects.nonNull(invoiceCriteria.getToAmountItem())) {
-			Subquery<Long> sub = criteriaQuery.subquery(Long.class);
-			Root<ItemEntity> subRoot = sub.from(ItemEntity.class);
-			Join subItem = subRoot.join("invoice");
-			sub.select(criteriaBuilder.count(subRoot.get("id")));
-			sub.where(criteriaBuilder.equal(root.get("id"), subItem.get("id")));
-			
-			//Subquery<Long> countChildren = query.subquery(Long.class);
-            //Root<ChildEntity> countChildrenRoot = countVotes.from(ChildEntity.class);
-            //Join countChildrenJoin = countChildrenRoot.join("parentField");
-            //countChildren.select(cb.count(countChildrenRoot.get(ID)));
-            //countChildren.where(cb.equal(root.get(ID), countChildrenJoin.get(ID)));
-			
-            criteriaQuery.where(criteriaBuilder.between(sub, invoiceCriteria.getFromAmountItem(),
-					invoiceCriteria.getToAmountItem()));
-		}
-
-		Predicate predicate = getPredicate(invoiceCriteria, criteriaBuilder, root);
+		Subquery<Long> sub = criteriaQuery.subquery(Long.class);
+		Root<ItemEntity> subRoot = sub.from(ItemEntity.class);
+		
+		sub.select(criteriaBuilder.count(subRoot.get("id")));
+		sub.where(criteriaBuilder.equal(root.get("id"), subRoot.get("invoice").get("id")));
+		
+		Predicate predicate = getPredicate(invoiceCriteria, criteriaBuilder, root, sub);
 		criteriaQuery.where(predicate);
-		setOrder(invoicePage, criteriaBuilder, criteriaQuery, root);
-
+		
+		setOrder(invoicePage, criteriaBuilder, criteriaQuery, root, sub);
+		
 		TypedQuery<InvoiceEntity> query = entityManager.createQuery(criteriaQuery);
 		query.setFirstResult(invoicePage.getPageNumber() * invoicePage.getPageSize());
 		query.setMaxResults(invoicePage.getPageSize());
@@ -72,7 +64,7 @@ public class InvoiceCustomRepositoryImpl implements InvoiceCustomRepository {
 	}
 
 	private Predicate getPredicate(InvoiceCriteria invoiceCriteria, CriteriaBuilder criteriaBuilder,
-			Root<InvoiceEntity> root) {
+			Root<InvoiceEntity> root, Subquery<Long> sub) {
 		List<Predicate> predicates = new ArrayList<>();
 
 		if (Objects.nonNull(invoiceCriteria.getFromDate()) && Objects.nonNull(invoiceCriteria.getToDate())) {
@@ -84,21 +76,46 @@ public class InvoiceCustomRepositoryImpl implements InvoiceCustomRepository {
 			predicates.add(criteriaBuilder.between(root.get("total"), invoiceCriteria.getFromPrice(),
 					invoiceCriteria.getToPrice()));
 		}
+		
+		if (Objects.nonNull(invoiceCriteria.getFromAmountItem()) && Objects.nonNull(invoiceCriteria.getToAmountItem())) {
+			predicates.add(criteriaBuilder.between(sub, invoiceCriteria.getFromAmountItem(),
+					invoiceCriteria.getToAmountItem()));
+		}
 
 		return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
 	}
 
 	private void setOrder(InvoicePage invoicePage, CriteriaBuilder criteriaBuilder,
-			CriteriaQuery<InvoiceEntity> criteriaQuery, Root<InvoiceEntity> root) {
-
-		if (Sort.Direction.ASC.equals(invoicePage.getSortDirection())) {
-			criteriaQuery.orderBy(criteriaBuilder.asc(root.get(invoicePage.getSortBy())));
-		} else {
-			criteriaQuery.orderBy(criteriaBuilder.desc(root.get(invoicePage.getSortBy())));
+			CriteriaQuery<InvoiceEntity> criteriaQuery, Root<InvoiceEntity> root, 
+			Subquery<Long> sub) {
+		if (invoicePage.getSortBy() != null) {
+			if ("asc".equals(invoicePage.getSortDirection().toLowerCase())) {
+				if ("amountItem".equals(invoicePage.getSortBy())){
+					
+					Join<InvoiceEntity, ItemEntity> join = root.join("items", JoinType.INNER);
+					Expression<Long> countExp = criteriaBuilder.count(join.get("id"));
+					criteriaQuery.groupBy(root.get("id"));
+					
+					criteriaQuery.orderBy(criteriaBuilder.asc(countExp));
+				}
+				else criteriaQuery.orderBy(criteriaBuilder.asc(root.get(invoicePage.getSortBy())));
+			} else if ("desc".equals(invoicePage.getSortDirection().toLowerCase())) {
+				if ("amountItem".equals(invoicePage.getSortBy())){
+					
+					Join<InvoiceEntity, ItemEntity> join = root.join("items", JoinType.INNER);
+					Expression<Long> countExp = criteriaBuilder.count(join.get("id"));
+					criteriaQuery.groupBy(root.get("id"));
+					criteriaQuery.orderBy(criteriaBuilder.desc(countExp));
+				}
+				else criteriaQuery.orderBy(criteriaBuilder.desc(root.get(invoicePage.getSortBy())));
+			}
 		}
 	}
 
 	private Pageable getPageable(InvoicePage invoicePage) {
+		if (invoicePage.getSortBy() == null || "amountItem".equals(invoicePage.getSortBy())) {
+			return PageRequest.of(invoicePage.getPageNumber(), invoicePage.getPageSize());
+		}
 		Sort sort = Sort.by(invoicePage.getSortDirection(), invoicePage.getSortBy());
 		return PageRequest.of(invoicePage.getPageNumber(), invoicePage.getPageSize(), sort);
 	}
